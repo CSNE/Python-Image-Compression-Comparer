@@ -15,8 +15,8 @@ import webbrowser
 
 
 ###Classes###
-# Base class for classes implementing an Observer pattern.
 class Bindable:
+    '''Base class for classes implementing an Observer pattern.'''
     def __init__(self, **kwargs):
         # pass
         self._callbacks = list()
@@ -30,10 +30,12 @@ class Bindable:
             i()
 
 
-# Slider with a label and a value display.
-# expects these keyword argumemts:
-# plus_name, plus_max,plus_min,plus_divisions,plus_format,plus_callback
+
 class SliderPlus(Bindable, Frame):
+    '''Slider with a label and a value display.
+REQUIRES these keyword argumemts:
+plus_name, plus_max,plus_min,plus_divisions,plus_format
+'''
     def __init__(self, **kw):
         # Variables
         self._plus_name = kw["plus_name"]
@@ -41,8 +43,6 @@ class SliderPlus(Bindable, Frame):
         self._plus_min = kw["plus_min"]
         self._plus_divisions = kw["plus_divisions"]
         self._plus_format = kw["plus_format"]
-        self._plus_callback = kw["plus_callback"]
-
         self._plus_value = self._plus_min
 
         # This is ugly.(duh)
@@ -51,7 +51,6 @@ class SliderPlus(Bindable, Frame):
         del kw["plus_min"]
         del kw["plus_divisions"]
         del kw["plus_format"]
-        del kw["plus_callback"]
 
         super().__init__(**kw)
 
@@ -64,11 +63,9 @@ class SliderPlus(Bindable, Frame):
                                   command=self._plus_slider_changed)
         self._plus_slider.grid(column=2, row=1, sticky=(W, E))
         self.columnconfigure(2, weight=1)
-
         self._plus_slider.bind("<ButtonRelease>", self._slider_released)
 
         # Value
-
         self._plus_value_str_label = Label(self, text=str(self._plus_min))
         self._plus_value_str_label.grid(column=3, row=1, sticky=(W, E))
 
@@ -84,12 +81,15 @@ class SliderPlus(Bindable, Frame):
         return self._plus_value
 
 
-# This class generates an image parameter pane, containing all the parameters for the iamge compression.
-# After parameters are changed, it compresses a source_image and replaces image
+
 class ImageParameterPane(Frame):
+    '''This class generates an image parameter pane, containing all the parameters for the image compression.
+After parameters are changed, it compresses the source_image and replaces image
+'''
     def __init__(self, image, source_image, **kw):
 
         super().__init__(**kw)
+        #Variables
         self._image = image
         self._source_image = source_image
 
@@ -102,33 +102,34 @@ class ImageParameterPane(Frame):
         self._notebook.bind("<ButtonRelease>", lambda e: self._rerender_image())
         self.columnconfigure(1, weight=1)
 
+        # UI>PNG
         self._tab_png = Frame(self)
         self._png_slider_compression = SliderPlus(plus_name="Compression", plus_divisions=9, plus_format=0,
-                                                  plus_min=0, plus_max=9, plus_callback=None, master=self._tab_png)
+                                                  plus_min=0, plus_max=9,  master=self._tab_png)
         self._png_slider_compression.grid(column=1, row=1, sticky=(W, E, N, S))
         self._png_slider_compression.bind(self._rerender_image)
-
+        #UI>JPEG
         self._tab_jpeg = Frame(self)
         self._jpeg_slider_quality = SliderPlus(plus_name="Quality", plus_divisions=99, plus_format=0,
-                                               plus_min=1, plus_max=100, plus_callback=None, master=self._tab_jpeg)
+                                               plus_min=1, plus_max=100, master=self._tab_jpeg)
         self._jpeg_slider_quality.grid(column=1, row=1, sticky=(W, E, N, S))
         self._jpeg_slider_quality.bind(self._rerender_image)
 
         self._jpeg_slider_subsampling = SliderPlus(plus_name="Chroma Subsampling", plus_divisions=2, plus_format=0,
-                                                   plus_min=0, plus_max=2, plus_callback=None, master=self._tab_jpeg)
+                                                   plus_min=0, plus_max=2,  master=self._tab_jpeg)
         self._jpeg_slider_subsampling.grid(column=1, row=2, sticky=(W, E, N, S))
         self._jpeg_slider_subsampling.bind(self._rerender_image)
-
+        #UI>GIF
         self._tab_gif = Frame(self)
         self._gif_label = Label(self._tab_gif, text="No Options.")
         self._gif_label.grid(column=1, row=1, sticky=(W, E, N, S))
         self._tab_gif.columnconfigure(1, weight=1)
-
+        #UI>BMP
         self._tab_bmp = Frame(self)
         self._bmp_label = Label(self._tab_bmp, text="No Options.")
         self._bmp_label.grid(column=1, row=1, sticky=(W, E, N, S))
         self._tab_bmp.columnconfigure(1, weight=1)
-
+        #UI>JPEG2000
         self._tab_jpeg2 = Frame(self)
         self._jpeg2_label = Label(self._tab_jpeg2, text="Well...(Click here)", foreground="blue", cursor="hand2")
         self._jpeg2_label.bind("<Button-1>",
@@ -140,12 +141,9 @@ class ImageParameterPane(Frame):
         self._notebook.add(self._tab_jpeg, text="JPEG")
         self._notebook.add(self._tab_bmp, text="BMP")
         self._notebook.add(self._tab_jpeg2, text="JPEG2000")
-
+        #UI>Bottom buttons and labels
         self._actions = Frame(self)
         self._actions.grid(column=1, row=2, sticky=(W, E, N, S))
-
-        # self._actions_compress=Button(self._actions,text="Compress",command=self._rerender_image)
-        # self._actions_compress.grid(column=1, row=1, sticky=(W, E, N, S))
 
         self._actions_save = Button(self._actions, text="Save", command=self._save_image)
         self._actions_save.grid(column=2, row=1, sticky=(W, N, S))
@@ -160,10 +158,10 @@ class ImageParameterPane(Frame):
         self._actions.columnconfigure(4, weight=1)
 
         # Bind
-
         self._source_image.bind(self._rerender_image)
 
     def _parse_params(self):
+        '''Parses image compression parameters from the UI and returns a dict with all the active parameters.'''
         selected_ = self._notebook.select()
         selected = self._notebook.tab(selected_)["text"]
         res = dict()
@@ -181,10 +179,10 @@ class ImageParameterPane(Frame):
             pass
         else:
             raise Exception
-        # print(res)
         return res
 
     def _rerender_image(self):
+        '''Compresses _source_image with the parameters set by the user, and replaces the _image.'''
         self._params = self._parse_params()
 
         if self._params["Type"] == "JPEG2000":
@@ -208,6 +206,7 @@ class ImageParameterPane(Frame):
         pass
 
     def _save_image(self):
+        '''Save the previously compressed image to a file.'''
         filename_orig = self._source_image.name
         filename_noext = os.path.splitext(filename_orig)[0]
         ext = "." + self._params["Type"]
@@ -218,39 +217,44 @@ class ImageParameterPane(Frame):
                 f.write(self._image_data.getbuffer())
 
 
-# Like an image label, but takes a MutableImage.Image and is zoomable.
-# Underlying structure is still tk's Label
+
 class ZoomableImageLabel(Frame):
+    '''Like an image label, but takes a MutableImage and is zoomable by supplying a bounding box.
+The underlying structure is still ttk's Label'''
     def __init__(self, image, image_controls, **kw):
         super().__init__(**kw)
 
+        #Variables
         self._PIL_image = image
-
         self._tk_image = None
 
         self._PIL_image.bind(self.new_image)
 
+        #UI
         self._border = 5
         self.configure(borderwidth=self._border, relief=GROOVE)
 
         self._label = Label(self)
         self._label.place(relx=.5, rely=.5, anchor="c")
-        # self._label.grid(row=1,column=1)
 
         self._image_controls = image_controls
         self._image_controls.bind(self.new_image)
 
+        #We delegate the drag controls to _image_controls.
         self._label.bind("<B1-Motion>", self._image_controls.drag_callback)
         self._label.bind("<Button-1>", self._image_controls.drag_callback)
         self._label.bind("<ButtonRelease-1>", self._image_controls.drag_callback)
 
+        #Bind for size changes
         self.bind("<Configure>", self._configured)
 
     def new_image(self):
+        '''Called when the _image is replaced'''
         self.tk_image = PIL.ImageTk.PhotoImage(self._generate_image())
         self._label.configure(image=self.tk_image)
 
     def _generate_image(self):
+        '''Generates a zoomed image using the _image and _image_control's viewport box.'''
         bounds = self._image_controls.get_viewport_box()
         image_bounds = self._image_controls.get_image_size()
         image_bounds_tuple = (int(round(image_bounds[0])), int(round(image_bounds[1])))
@@ -269,6 +273,7 @@ class ZoomableImageLabel(Frame):
         return (self.winfo_width(), self.winfo_height())
 
     def _configured(self, evt):
+        '''Called when the size of the widget changes'''
         x = evt.width - self._border
         y = evt.height - self._border
         if x < 50:
@@ -279,6 +284,7 @@ class ZoomableImageLabel(Frame):
 
 
 class ImageControls(Bindable):
+    '''Class for controlling the ZoomableImageLabels.'''
     def __init__(self, master_image, **kwargs):
         super().__init__(**kwargs)
         self._bounding_box = [0, 0, 100, 100]  # x1 y1 x2 y2
@@ -377,6 +383,7 @@ class ImageControls(Bindable):
 
 
 class MutableImage(Bindable):
+    '''A wrapper for PIL.Image that can be binded for changes.'''
     def __init__(self):
         super().__init__()
         self._image = None
@@ -420,11 +427,10 @@ def new_image():
     top_open.configure(text=f)
 
 
-# Compresses image into a specified format in params, and then returns a ByteIO object with the compressed data.
-# Params is a dict containing all the image compression parameters.
-#  Params["Type"] = "JPEG" / "GIF" / "PNG"
-#    if JPEG, required elements are "Quality" and "Subsampling"
+
 def compress(image, params):
+    '''Compresses image into a specified format in params, and then returns a ByteIO object with the compressed data.
+Params is a dict containing all the image compression parameters.'''
     output = BytesIO()
     if params["Type"] == "JPEG":
         image.save(output, 'JPEG', quality=params["Quality"], subsampling=params["Subsampling"])
