@@ -9,10 +9,64 @@ from tkinter.ttk import *
 from tkinter import filedialog
 
 from io import BytesIO
-from time import time
 import os
 import webbrowser
+import traceback
 
+###Constants###
+s='''
+You can enter a python script here to be run, to fully customize your conversion process.
+
+The script can use all the builtin functions of Python3.
+You can print to the standard output using print(). Those will show up in the console window.
+
+
+The python script is given these variables:
+
+Filename : The filename.
+Extension : The filename extension.
+Filename_no_extension : Filename with its extension stripped.
+Width : The width of the source image.
+Height : The height of the source image.
+Mode : Image mode of the source image.
+Size : The size of the source image file, in bytes.
+These variables are in the global namespace; you can use them like any other python variable.
+
+
+The python script should end with a return statement. The return statement should return a single dict, with all the image conversion parameters.
+
+The dict MUST have these elements:
+"Filename" : The filename of the converted image.
+"Type" : The file type. Supported types are "JPEG", "GIF", "PNG", "BMP", or "JPEG2000","Copy", and "Pass". "Copy" will copy the image file without re-encoding, and "Pass" will simply skip the image.
+
+Some file types require additional dict elements.
+
+JPEG:
+    "Quality" : Integer value from 1 to 100.
+    "Subsampling" : Integer value from 0 to 2.
+
+PNG:
+    "Compression" : Integer value from 0 to 9.
+
+
+You can resize images by including the "Resize" element.
+The "Resize" element should be a tuple, containg two elements, for the desired X and Y size.
+You can also specify the sampling method, by including the "Resize_sampling" element. Valid values are "Nearest Neighbor", "Bilinear","Bicubic" and "Lanczos". If not supplied, it defaults to Bicubic sampling.
+
+
+Example usage:
+print("hello world")
+if Extension.lower()==".gif": #We can't convert animated GIFs, copy them as is.
+    return {"Type":"Copy","Filename":Filename}
+if Width>1000: #If the width is too long, trim it down to 1000 pixels.
+    return {"Type":"JPEG","Filename":"Converted_"+Filename_no_extension+".jpeg","Quality":70,"Subsampling":0,
+            "Resize":(1000,int(1000/Width*Height)),"Resize_sampling":"Bicubic"}
+if Height>1000: #If the width is too long, trim it down to 1000 pixels.
+    return {"Type":"JPEG","Filename":"Converted_"+Filename_no_extension+".jpeg","Quality":70,"Subsampling":0,
+            "Resize":(int(1000/Height*Width),1000),"Resize_sampling":"Bicubic"}
+return {"Filename":Filename,"Type":"PNG","Compression":7} #Others just convert to PNG.
+
+'''
 
 ###Classes###
 class Bindable:
@@ -57,6 +111,7 @@ plus_name, plus_max,plus_min,plus_divisions,plus_format
 
         super().__init__(**kw)
 
+
         # Label
         self._plus_label = Label(self, text=self._plus_name)
         self._plus_label.grid(row=1, column=1)
@@ -64,10 +119,10 @@ plus_name, plus_max,plus_min,plus_divisions,plus_format
         # Slider
         self._plus_slider = Scale(self, orient=HORIZONTAL, length=200, from_=0, to=self._plus_divisions, value=0,
                                   command=self._plus_slider_changed)
-        self._plus_slider.grid(column=2, row=1, sticky=(W, E))
+        self._plus_slider.grid(column=2, row=1, padx=5,sticky=(W, E))
         self.columnconfigure(2, weight=1)
         self._plus_slider.bind("<ButtonRelease>", self._slider_released)
-
+        self.columnconfigure(2,weight=1)
         # Value
         self._plus_value_str_label = Label(self, text=str(self._plus_min))
         self._plus_value_str_label.grid(column=3, row=1, sticky=(W, E))
@@ -88,8 +143,9 @@ plus_name, plus_max,plus_min,plus_divisions,plus_format
 class ImageParameterPane(Frame):
     '''This class generates an image parameter pane, containing all the parameters for the image compression.
 After parameters are changed, it compresses the source_image and replaces image
+If source_image is not supplied, it will default to a image-less mode, where it is not bound to any other image.
 '''
-    def __init__(self, image, source_image, **kw):
+    def __init__(self, image=None, source_image=None, **kw):
 
         super().__init__(**kw)
         #Variables
@@ -111,6 +167,7 @@ After parameters are changed, it compresses the source_image and replaces image
                                                   plus_min=0, plus_max=9,  master=self._tab_png)
         self._png_slider_compression.grid(column=1, row=1, sticky=(W, E, N, S))
         self._png_slider_compression.bind(self._rerender_image)
+        self._tab_png.columnconfigure(1,weight=1)
         #UI>JPEG
         self._tab_jpeg = Frame(self)
         self._jpeg_slider_quality = SliderPlus(plus_name="Quality", plus_divisions=99, plus_format=0,
@@ -122,16 +179,19 @@ After parameters are changed, it compresses the source_image and replaces image
                                                    plus_min=0, plus_max=2,  master=self._tab_jpeg)
         self._jpeg_slider_subsampling.grid(column=1, row=2, sticky=(W, E, N, S))
         self._jpeg_slider_subsampling.bind(self._rerender_image)
+        self._tab_jpeg.columnconfigure(1,weight=1)
         #UI>GIF
         self._tab_gif = Frame(self)
         self._gif_label = Label(self._tab_gif, text="No Options.")
         self._gif_label.grid(column=1, row=1, sticky=(W, E, N, S))
         self._tab_gif.columnconfigure(1, weight=1)
+        self._tab_gif.columnconfigure(1,weight=1)
         #UI>BMP
         self._tab_bmp = Frame(self)
         self._bmp_label = Label(self._tab_bmp, text="No Options.")
         self._bmp_label.grid(column=1, row=1, sticky=(W, E, N, S))
         self._tab_bmp.columnconfigure(1, weight=1)
+        self._tab_bmp.columnconfigure(1,weight=1)
         #UI>JPEG2000
         self._tab_jpeg2 = Frame(self)
         self._jpeg2_label = Label(self._tab_jpeg2, text="Well...(Click here)", foreground="blue", cursor="hand2")
@@ -144,6 +204,12 @@ After parameters are changed, it compresses the source_image and replaces image
         self._notebook.add(self._tab_jpeg, text="JPEG")
         self._notebook.add(self._tab_bmp, text="BMP")
         self._notebook.add(self._tab_jpeg2, text="JPEG2000")
+        self._tab_jpeg2.columnconfigure(1,weight=1)
+
+
+        if source_image==None:
+            return
+
         #UI>Bottom buttons and labels
         self._actions = Frame(self)
         self._actions.grid(column=1, row=2, sticky=(W, E, N, S))
@@ -163,12 +229,11 @@ After parameters are changed, it compresses the source_image and replaces image
         # Bind
         self._source_image.bind(self._rerender_image)
 
-
         #Finally rerender
         self._rerender_image()
     def release(self):
         self._source_image.unbind(self._rerender_image)
-    def _parse_params(self):
+    def parse_params(self):
         '''Parses image compression parameters from the UI and returns a dict with all the active parameters.'''
         selected_ = self._notebook.select()
         selected = self._notebook.tab(selected_)["text"]
@@ -191,9 +256,11 @@ After parameters are changed, it compresses the source_image and replaces image
 
     def _rerender_image(self):
         '''Compresses _source_image with the parameters set by the user, and replaces the _image.'''
-        self._params = self._parse_params()
+        self._params = self.parse_params()
 
         if self._params["Type"] == "JPEG2000":
+            return
+        if self._source_image==None:
             return
         if self._source_image.image == None:
             return
@@ -257,6 +324,7 @@ The underlying structure is still ttk's Label'''
         self.bind("<Configure>", self._configured)
     def release(self):
         self._image_controls.unbind(self.new_image)
+        self._PIL_image.unbind(self.new_image)
     def new_image(self):
         '''Called when the _image is replaced'''
         img=self._generate_image()
@@ -307,7 +375,8 @@ class ImageControls(Bindable):
         self._window_size = [100, 100]
         self._master_image = master_image
         master_image.bind(self._new_image)
-
+    def release(self):
+        self._master_image.unbind(self._new_image)
     def get_viewport_box(self):
         return self._bounding_box
 
@@ -418,6 +487,153 @@ class MutableImage(Bindable):
     def name(self):
         return self._name
 
+class BatchWindow:
+    def __init__(self,master):
+
+        self._directory_from=None
+        self._directory_to=None
+
+        self._master=master
+        self._dialog=Toplevel(master)
+
+
+        self._panel_directories=Frame(self._dialog)
+        self._panel_directories.grid(row=1,column=1,sticky=(N,S,E,W))
+
+        self._dialog.columnconfigure(1,weight=1)
+
+        self._dialog.rowconfigure(2,weight=1)
+
+
+        self._directories_from_button=Button(self._panel_directories,text="From",command=self._get_dir_from)
+        self._directories_from_button.grid(row=1,column=1,sticky=(N,S,E,W))
+
+        self._directories_from_label=Label(self._panel_directories,text="?")
+        self._directories_from_label.grid(row=1,column=2,sticky=(N,S,E,W))
+        self._panel_directories.columnconfigure(2,weight=1)
+
+        self._directories_to_button=Button(self._panel_directories,text="to",command=self._get_dir_to)
+        self._directories_to_button.grid(row=2,column=1,sticky=(N,S,E,W))
+
+        self._directories_to_label=Label(self._panel_directories,text="?")
+        self._directories_to_label.grid(row=2,column=2,sticky=(N,S,E,W))
+
+        self._directories_start_button=Button(self._panel_directories,text="Convert!",command=self.batch_start)
+        self._directories_start_button.grid(row=3,column=1,columnspan=2,sticky=(N,S,E,W))
+
+        self._panel_results=Frame(self._dialog)
+        self._panel_results.grid(row=2,column=1,sticky=(N,S,E,W))
+
+
+        self._results_text=Text(self._panel_results, font=("Consolas",10))
+        self._results_text.grid(row=1,column=1,sticky=(N,S,E,W))
+
+        self._results_text.tag_config("error", foreground="red")
+        self._panel_results.columnconfigure(1,weight=1)
+        self._panel_results.rowconfigure(1,weight=1)
+
+        self._panel_params=Notebook(self._dialog)
+        self._panel_params.grid(row=1,column=2,rowspan=2,sticky=(N,S,E,W))
+        self._dialog.columnconfigure(2,weight=1)
+
+        self._tab_code=Frame(self._panel_params)
+
+        self._tab_code_editor=Text(self._tab_code, font=("Consolas",10))
+        self._tab_code_editor.grid(row=1,column=1,sticky=(N,S,E,W))
+        self._tab_code.columnconfigure(1,weight=1)
+        self._tab_code.rowconfigure(1,weight=1)
+        self._tab_code_editor.insert(END,s)
+
+        self._tab_gui=Frame(self._panel_params)
+
+        self._tab_gui_params=ImageParameterPane(master=self._tab_gui)
+        self._tab_gui_params.grid(row=1,column=1,sticky=(N,S,E,W))
+        self._tab_gui.columnconfigure(1,weight=1)
+
+        self._panel_params.add(self._tab_gui,text="GUI")
+        self._panel_params.add(self._tab_code,text="Python")
+
+    def _get_dir_from(self):
+        f = filedialog.askdirectory(title="Image Folder")
+        if f == None or f == '':
+            return
+        #f=r"C:\0_User\Temp\batch"
+        self._directory_from=f
+        self._directories_from_label.configure(text=f)
+
+    def _get_dir_to(self):
+        f = filedialog.askdirectory(title="Image Folder")
+        if f == None or f == '':
+            return
+        #f=r"C:\0_User\Temp\batch_dest"
+        self._directory_to=f
+        self._directories_to_label.configure(text=f)
+
+    def _evaluate(self,img,filename,sizee):
+        inp = self._tab_code_editor.get("1.0", 'end-1c')
+        inps=inp.split("\n")
+        functional='def _evaluation_function():\n'
+        for i in range(len(inps)):
+            functional+="    "+inps[i]+"\n"
+
+        g={}
+        g["Filename"]=filename
+        g["Extension"]=os.path.splitext(filename)[-1]
+        g["Filename_no_extension"]=os.path.splitext(filename)[0]
+        g["Width"]=img.width
+        g["Height"]=img.height
+        g["Mode"]=img.mode
+        g["Size"]=sizee
+        exec(functional,g)
+        return g["_evaluation_function"]()
+    def _convert(self):
+        pass
+    def _close(self):
+        self.dialog.destroy()
+    def batch_start(self):
+        selected_ = self._panel_params.select()
+        tab_selected = self._panel_params.tab(selected_)["text"]
+
+
+        files=os.listdir(self._directory_from)
+        num=len(files)
+        n=0
+
+        for filename in files:
+            n+=1
+            try:
+                full_path=os.path.join(self._directory_from,filename)
+
+                img=PIL.Image.open(full_path)
+                if tab_selected=="Python":
+                    params=self._evaluate(img,filename,os.path.getsize(full_path))
+
+                elif tab_selected=="GUI":
+                    params=self._tab_gui_params.parse_params()
+                    params["Filename"]=os.path.splitext(filename)[0]+"."+params["Type"]
+
+
+                print("Converting",full_path,"\nUsing params:",params)
+                param_string="\n".join([i+" : "+str(params[i]) for i in params])
+                self._results_text.insert("1.0","Converting : "+full_path+" ("+str(n)+"/"+str(num)+")"+"\n"+param_string+"\n\n")
+
+                self._master.update()
+
+                if params["Type"]=="Pass":
+                    continue
+                if params["Type"]=="Copy":
+                    with open(os.path.join(self._directory_to,params["Filename"]), "wb") as filee:
+                        filee.write(open(full_path,"rb").read())
+                else:
+                    img_dat=compress(img,params)
+
+                    with open(os.path.join(self._directory_to,params["Filename"]), "wb") as filee:
+                        filee.write(img_dat.getbuffer())
+            except:
+                self._results_text.insert("1.0","Error while converting : "+full_path+"\n"+traceback.format_exc()+"\n\n",("error",))
+                continue
+            #sleep(1)
+
 
 ###Global variables###
 num_images=2
@@ -442,13 +658,30 @@ def new_image():
     top_open.configure(text=f)
 
 
+def batch_start():
+    global tk
+    BatchWindow(tk)
 
 def compress(image, params):
     '''Compresses image into a specified format in params, and then returns a ByteIO object with the compressed data.
 Params is a dict containing all the image compression parameters.'''
     output = BytesIO()
+
+    if "Resize" in params:
+        try:
+            sampling={"Nearest Neighbor":PIL.Image.NEAREST,"Bilinear":PIL.Image.BILINEAR,
+                      "Bicubic":PIL.Image.BICUBIC,"Lanczos":PIL.Image.LANCZOS}[params["Resize_sampling"]]
+        except KeyError:
+            sampling=PIL.Image.BICUBIC
+
+        image=image.resize(params["Resize"],sampling)
+
+
     if params["Type"] == "JPEG":
-        image.save(output, 'JPEG', quality=params["Quality"], subsampling=params["Subsampling"])
+        try:
+            image.save(output, 'JPEG', quality=params["Quality"], subsampling=params["Subsampling"])
+        except OSError:
+            image.convert('RGB').save(output, 'JPEG', quality=params["Quality"], subsampling=params["Subsampling"])
     elif params["Type"] == "GIF":
         image.save(output, 'GIF')
     elif params["Type"] == "PNG":
@@ -484,6 +717,10 @@ top_open = Label(top, text="???")
 top_open.grid(column=2, row=1, sticky=(W, E, N, S))
 top.columnconfigure(2, weight=1)
 
+# Root>Top>Batch
+top_batch = Button(top, text="Batch Convert", command=batch_start)
+top_batch.grid(column=3, row=1, sticky=(W, E, N, S))
+
 # Root>Top-Image-Divider
 image_top_image_divider = Separator(tk, orient=HORIZONTAL)
 image_top_image_divider.grid(column=1, columnspan=3, row=2, sticky=(N, S, E, W))
@@ -517,8 +754,9 @@ def more_panels(divider=True):
     # Root>Images>Display i
     image_display = ZoomableImageLabel(new_image, image_controls, master=images_frame, height=300)
     image_display.grid(column=i*2, row=1, padx=5,pady=5, sticky=(W, E, N, S))
+    #image_display.bind("<MouseWheel>", image_controls.scroll_callback)
     images_frame.rowconfigure(1, weight=1)
-    images_frame.columnconfigure(i*2+1, weight=1)
+    images_frame.columnconfigure(i*2, weight=1)
 
     # Root>Images>Params i
     image_params = ImageParameterPane(new_image, mutableImage_source, master=images_frame, height=300)
@@ -536,7 +774,7 @@ def more_panels(divider=True):
     image_panels.append(panel_set)
 
 for i in range(num_images):
-   more_panels(i)
+   more_panels()
 
 buttons=Frame(images_frame)
 buttons.grid(column=100, row=2, padx=5,pady=5,sticky=(W, E, N, S))
