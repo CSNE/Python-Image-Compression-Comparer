@@ -10,4 +10,4 @@ Requirements: Any standard Python 3 installation (with tkinter) and Pillow.
 
 The interface is pretty straightforward. Open an image, compress and compare, and save.
 
-To change the number of images displayed, modify the num_images variable at main.py (line 400)
+The program also has a batch conversion feature. Press the button on the upper right.
