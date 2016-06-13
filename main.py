@@ -29,6 +29,9 @@ class Bindable:
         for i in self._callbacks:
             i()
 
+    def unbind(self,obj):
+        self._callbacks.remove(obj)
+
 
 
 class SliderPlus(Bindable, Frame):
@@ -160,6 +163,11 @@ After parameters are changed, it compresses the source_image and replaces image
         # Bind
         self._source_image.bind(self._rerender_image)
 
+
+        #Finally rerender
+        self._rerender_image()
+    def release(self):
+        self._source_image.unbind(self._rerender_image)
     def _parse_params(self):
         '''Parses image compression parameters from the UI and returns a dict with all the active parameters.'''
         selected_ = self._notebook.select()
@@ -247,10 +255,15 @@ The underlying structure is still ttk's Label'''
 
         #Bind for size changes
         self.bind("<Configure>", self._configured)
-
+    def release(self):
+        self._image_controls.unbind(self.new_image)
     def new_image(self):
         '''Called when the _image is replaced'''
-        self.tk_image = PIL.ImageTk.PhotoImage(self._generate_image())
+        img=self._generate_image()
+        if img==None:
+            print("ZoomableImageLabel:new_image() called but image is null! Noop.")
+            return
+        self.tk_image = PIL.ImageTk.PhotoImage(img)
         self._label.configure(image=self.tk_image)
 
     def _generate_image(self):
@@ -266,6 +279,9 @@ The underlying structure is still ttk's Label'''
             sampling = PIL.Image.NEAREST
             # print("Nearset!")
         img = self._PIL_image.image
+        if img==None:
+            print("ZoomableImageLabel:_generate_image() called but image is null! returning None.")
+            return
         # print(bounds,image_bounds,image_bounds_tuple)
         return img.transform(image_bounds_tuple, PIL.Image.EXTENT, data=tuple(bounds), resample=sampling)
 
@@ -408,7 +424,6 @@ num_images=2
 
 mutableImage_source = MutableImage()
 
-mutableImages = [MutableImage() for i in range(num_images)]
 
 image_controls = ImageControls(mutableImage_source)
 
@@ -477,21 +492,61 @@ image_top_image_divider.grid(column=1, columnspan=3, row=2, sticky=(N, S, E, W))
 images_frame=Frame(tk)
 images_frame.grid(column=1,  row=3,  sticky=(W, E, N, S))
 images_frame.rowconfigure(1, weight=1)
+tk.rowconfigure(3, weight=1)
 
-for i in range(num_images):
-    if i!=0: #We don't want a divider on the first image.
-        # Root>Images>Divider i
-        image_divider = Separator(images_frame, orient=VERTICAL)
-        image_divider.grid(column=i*2, row=1,rowspan=2, sticky=(N, S, E, W))
+image_panels=[]
 
+def remove_panel():
+    print("less")
+    for i in image_panels[-1]:
+        print(i)
+        if hasattr(i,"release"):
+            i.release()
+        i.grid_forget()
+        i.destroy()
+
+    del image_panels[-1]
+
+
+
+def more_panels(divider=True):
+    panel_set=[]
+    i=len(image_panels)
+    new_image=MutableImage()
+    print("more",i)
     # Root>Images>Display i
-    image_display = ZoomableImageLabel(mutableImages[i], image_controls, master=images_frame, height=300)
-    image_display.grid(column=i*2+1, row=1, padx=5,pady=5, sticky=(W, E, N, S))
+    image_display = ZoomableImageLabel(new_image, image_controls, master=images_frame, height=300)
+    image_display.grid(column=i*2, row=1, padx=5,pady=5, sticky=(W, E, N, S))
     images_frame.rowconfigure(1, weight=1)
     images_frame.columnconfigure(i*2+1, weight=1)
 
     # Root>Images>Params i
-    image_params = ImageParameterPane(mutableImages[i], mutableImage_source, master=images_frame, height=300)
-    image_params.grid(column=i*2+1, row=2, padx=5,pady=5,sticky=(W, E, N, S))
+    image_params = ImageParameterPane(new_image, mutableImage_source, master=images_frame, height=300)
+    image_params.grid(column=i*2, row=2, padx=5,pady=5,sticky=(W, E, N, S))
+
+    if divider:
+        # Root>Images>Divider i
+        image_divider = Separator(images_frame, orient=VERTICAL)
+        image_divider.grid(column=i*2+1, row=1,rowspan=2, sticky=(N, S, E, W))
+        panel_set.append(image_divider)
+
+    panel_set.append(image_display)
+    panel_set.append(image_params)
+
+    image_panels.append(panel_set)
+
+for i in range(num_images):
+   more_panels(i)
+
+buttons=Frame(images_frame)
+buttons.grid(column=100, row=2, padx=5,pady=5,sticky=(W, E, N, S))
+
+more_btn=Button(buttons,text="+",command=more_panels)
+more_btn.grid(column=1, row=1, padx=5,pady=5,sticky=(W, E, N, S))
+buttons.rowconfigure(1,weight=1)
+
+less_btn=Button(buttons,text="-",command=remove_panel)
+less_btn.grid(column=1, row=2, padx=5,pady=5,sticky=(W, E, N, S))
+buttons.rowconfigure(2,weight=1)
 
 tk.mainloop()
