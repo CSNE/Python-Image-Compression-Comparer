@@ -44,7 +44,7 @@ Some file types require additional dict elements.
 
 JPEG:
     "Quality" : Integer value from 1 to 100.
-    "Subsampling" : Integer value from 0 to 2.
+    "Subsampling" : Integer value from 0 to 2. 0=4:4:4, 1=4:2:2, 2=4:1:1
 
 PNG:
     "Compression" : Integer value from 0 to 9.
@@ -102,12 +102,20 @@ plus_name, plus_max,plus_min,plus_divisions,plus_format
         self._plus_format = kw["plus_format"]
         self._plus_value = self._plus_min
 
+
         # This is ugly.(duh)
         del kw["plus_name"]
         del kw["plus_max"]
         del kw["plus_min"]
         del kw["plus_divisions"]
         del kw["plus_format"]
+
+        try:
+            self._plus_display_override=kw['plus_display_override']
+            del kw['plus_display_override']
+        except KeyError:
+            self._plus_display_override=None
+            pass
 
         super().__init__(**kw)
 
@@ -127,13 +135,20 @@ plus_name, plus_max,plus_min,plus_divisions,plus_format
         self._plus_value_str_label = Label(self, text=str(self._plus_min))
         self._plus_value_str_label.grid(column=3, row=1, sticky=(W, E))
 
+
+        self._plus_slider_changed(self._plus_min)
+
     def _slider_released(self, evt):
         self._callback()
 
     def _plus_slider_changed(self, x):
         self._plus_value = int(round(float(x))) / self._plus_divisions * (
-        self._plus_max - self._plus_min) + self._plus_min
-        self._plus_value_str_label.configure(text=("{:." + str(self._plus_format) + "f}").format(self._plus_value))
+                            self._plus_max - self._plus_min) + self._plus_min
+        #print(type(self._plus_value))
+        if self._plus_display_override==None:
+            self._plus_value_str_label.configure(text=("{:." + str(self._plus_format) + "f}").format(self._plus_value))
+        else:
+            self._plus_value_str_label.configure(text=self._plus_display_override(self._plus_value))
 
     def get_value(self):
         return self._plus_value
@@ -176,7 +191,9 @@ If source_image is not supplied, it will default to a image-less mode, where it 
         self._jpeg_slider_quality.bind(self._rerender_image)
 
         self._jpeg_slider_subsampling = SliderPlus(plus_name="Chroma Subsampling", plus_divisions=2, plus_format=0,
-                                                   plus_min=0, plus_max=2,  master=self._tab_jpeg)
+                                                   plus_min=0, plus_max=2,
+                                                   plus_display_override= lambda x:["4:4:4","4:2:2","4:1:1"][int(round(x))],
+                                                   master=self._tab_jpeg)
         self._jpeg_slider_subsampling.grid(column=1, row=2, sticky=(W, E, N, S))
         self._jpeg_slider_subsampling.bind(self._rerender_image)
         self._tab_jpeg.columnconfigure(1,weight=1)
@@ -240,10 +257,10 @@ If source_image is not supplied, it will default to a image-less mode, where it 
         res = dict()
         res["Type"] = selected
         if selected == "JPEG":
-            res["Quality"] = int(self._jpeg_slider_quality.get_value())
-            res["Subsampling"] = int(self._jpeg_slider_subsampling.get_value())
+            res["Quality"] = int(round(self._jpeg_slider_quality.get_value()))
+            res["Subsampling"] = int(round(self._jpeg_slider_subsampling.get_value()))
         elif selected == "PNG":
-            res["Compression"] = int(self._png_slider_compression.get_value())
+            res["Compression"] = int(round(self._png_slider_compression.get_value()))
         elif selected == 'GIF':
             pass
         elif selected == 'BMP':
@@ -329,7 +346,7 @@ The underlying structure is still ttk's Label'''
         '''Called when the _image is replaced'''
         img=self._generate_image()
         if img==None:
-            print("ZoomableImageLabel:new_image() called but image is null! Noop.")
+            #print("ZoomableImageLabel:new_image() called but image is null! Noop.")
             return
         self.tk_image = PIL.ImageTk.PhotoImage(img)
         self._label.configure(image=self.tk_image)
@@ -348,7 +365,7 @@ The underlying structure is still ttk's Label'''
             # print("Nearset!")
         img = self._PIL_image.image
         if img==None:
-            print("ZoomableImageLabel:_generate_image() called but image is null! returning None.")
+            #print("ZoomableImageLabel:_generate_image() called but image is null! returning None.")
             return
         # print(bounds,image_bounds,image_bounds_tuple)
         return img.transform(image_bounds_tuple, PIL.Image.EXTENT, data=tuple(bounds), resample=sampling)
@@ -654,7 +671,7 @@ class BatchWindow:
                     params["Filename"]=os.path.splitext(filename)[0]+"."+params["Type"]
 
 
-                print("Converting",full_path,"\nUsing params:",params)
+                #print("Converting",full_path,"\nUsing params:",params)
                 param_string="\n".join([i+" : "+str(params[i]) for i in params])
 
                 self._results_text.configure(state='normal')
@@ -780,9 +797,9 @@ tk.rowconfigure(3, weight=1)
 image_panels=[]
 
 def remove_panel():
-    print("less")
+    #print("less")
     for i in image_panels[-1]:
-        print(i)
+        #print(i)
         if hasattr(i,"release"):
             i.release()
         i.grid_forget()
@@ -796,7 +813,7 @@ def more_panels(divider=True):
     panel_set=[]
     i=len(image_panels)
     new_image=MutableImage()
-    print("more",i)
+    #print("more",i)
     # Root>Images>Display i
     image_display = ZoomableImageLabel(new_image, image_controls, master=images_frame, height=300)
     image_display.grid(column=i*2, row=1, padx=5,pady=5, sticky=(W, E, N, S))
