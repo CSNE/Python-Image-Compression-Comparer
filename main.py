@@ -15,12 +15,13 @@ import traceback
 
 ###Constants###
 s='''
+!Scripting
 You can enter a python script here to be run, to fully customize your conversion process.
 
 The script can use all the builtin functions of Python3.
 You can print to the standard output using print(). Those will show up in the console window.
 
-
+!Input
 The python script is given these variables:
 
 Filename : The filename.
@@ -32,7 +33,7 @@ Mode : Image mode of the source image.
 Size : The size of the source image file, in bytes.
 These variables are in the global namespace; you can use them like any other python variable.
 
-
+!Return values
 The python script should end with a return statement. The return statement should return a single dict, with all the image conversion parameters.
 
 The dict MUST have these elements:
@@ -54,18 +55,17 @@ The "Resize" element should be a tuple, containg two elements, for the desired X
 You can also specify the sampling method, by including the "Resize_sampling" element. Valid values are "Nearest Neighbor", "Bilinear","Bicubic" and "Lanczos". If not supplied, it defaults to Bicubic sampling.
 
 
-Example usage:
+!Example code
 print("hello world")
 if Extension.lower()==".gif": #We can't convert animated GIFs, copy them as is.
     return {"Type":"Copy","Filename":Filename}
 if Width>1000: #If the width is too long, trim it down to 1000 pixels.
     return {"Type":"JPEG","Filename":"Converted_"+Filename_no_extension+".jpeg","Quality":70,"Subsampling":0,
             "Resize":(1000,int(1000/Width*Height)),"Resize_sampling":"Bicubic"}
-if Height>1000: #If the width is too long, trim it down to 1000 pixels.
+if Height>1000: #If the height is too long, trim it down to 1000 pixels.
     return {"Type":"JPEG","Filename":"Converted_"+Filename_no_extension+".jpeg","Quality":70,"Subsampling":0,
             "Resize":(int(1000/Height*Width),1000),"Resize_sampling":"Bicubic"}
 return {"Filename":Filename,"Type":"PNG","Compression":7} #Others just convert to PNG.
-
 '''
 
 ###Classes###
@@ -443,6 +443,7 @@ class ImageControls(Bindable):
         self._callback()
 
     def scroll_callback(self, evt):
+        #print(tk.focus_displayof())
         if evt.delta > 0:  # Scroll up
             self.zoom(0.8)
         else:
@@ -454,7 +455,6 @@ class ImageControls(Bindable):
             self._drag_start = (evt.x, evt.y)
             self._original_bounding_box = list(self._bounding_box)
         elif evt.type == '5':  # Released
-
             pass
         elif evt.type == '6':  # Dragged
             self._bounding_box = list(self._original_bounding_box)
@@ -495,6 +495,8 @@ class BatchWindow:
 
         self._master=master
         self._dialog=Toplevel(master)
+        self._dialog.iconbitmap("32.ico")
+        self._dialog.title("PICC Batch Convert")
 
 
         self._panel_directories=Frame(self._dialog)
@@ -539,10 +541,13 @@ class BatchWindow:
         self._tab_code=Frame(self._panel_params)
 
         self._tab_code_editor=Text(self._tab_code, font=("Consolas",10))
-        self._tab_code_editor.grid(row=1,column=1,sticky=(N,S,E,W))
+        self._tab_code_editor.grid(row=2,column=1,sticky=(N,S,E,W))
         self._tab_code.columnconfigure(1,weight=1)
-        self._tab_code.rowconfigure(1,weight=1)
-        self._tab_code_editor.insert(END,s)
+        self._tab_code.rowconfigure(2,weight=1)
+        #self._tab_code_editor.insert(END,s)
+
+        self._tab_code_help=Button(self._tab_code,text="Help",command=self._help)
+        self._tab_code_help.grid(row=1,column=1,sticky=(N,S,E,W))
 
         self._tab_gui=Frame(self._panel_params)
 
@@ -552,7 +557,27 @@ class BatchWindow:
 
         self._panel_params.add(self._tab_gui,text="GUI")
         self._panel_params.add(self._tab_code,text="Python")
+    def _help(self):
+        dialog=Toplevel(self._dialog)
+        text=Text(dialog, font=("Consolas",10))
+        text.grid(column=1,row=1,sticky=(N,S,E,W))
 
+        dialog.columnconfigure(1,weight=1)
+        dialog.rowconfigure(1,weight=1)
+
+        text.tag_config("heading", font=("Consolas",16), foreground="red")
+        for i in s.split("\n"):
+            try:
+                if i[0]=='!':
+                    text.insert(END,i[1:],("heading",))
+                else:
+                    text.insert(END,i)
+            except IndexError:
+                #print("IndexError")
+                text.insert(END,"")
+            text.insert(END,"\n")
+
+        text.configure(state="disabled")
     def _get_dir_from(self):
         f = filedialog.askdirectory(title="Image Folder")
         if f == None or f == '':
@@ -631,7 +656,7 @@ class BatchWindow:
                         filee.write(img_dat.getbuffer())
             except:
                 self._results_text.insert("1.0","Error while converting : "+full_path+"\n"+traceback.format_exc()+"\n\n",("error",))
-                continue
+                break
             #sleep(1)
 
 
@@ -639,7 +664,6 @@ class BatchWindow:
 num_images=2
 
 mutableImage_source = MutableImage()
-
 
 image_controls = ImageControls(mutableImage_source)
 
@@ -707,6 +731,7 @@ tk.bind_all("<MouseWheel>", image_controls.scroll_callback)
 top = Frame(tk)
 top.grid(column=1,  row=1, padx=5, pady=5, sticky=(W, E, N, S))
 tk.columnconfigure(1, weight=1)
+#top.bind("<MouseWheel>", image_controls.scroll_callback)
 
 # Root>Top>Open
 top_open = Button(top, text="Open Image", command=new_image)
