@@ -527,12 +527,18 @@ class BatchWindow:
         self._panel_results.grid(row=2,column=1,sticky=(N,S,E,W))
 
 
-        self._results_text=Text(self._panel_results, font=("Consolas",10))
+        self._results_text=Text(self._panel_results, font=("Consolas",10), background=self._master.cget('background'))
         self._results_text.grid(row=1,column=1,sticky=(N,S,E,W))
 
         self._results_text.tag_config("error", foreground="red")
+        self._results_text.configure(state='disabled')
         self._panel_results.columnconfigure(1,weight=1)
         self._panel_results.rowconfigure(1,weight=1)
+
+        #scroll
+        self._results_text_scroller = Scrollbar(self._panel_results, orient=VERTICAL, command=self._results_text.yview)
+        self._results_text_scroller.grid(column=2, row=1, sticky=(W, E, N, S))
+        self._results_text['yscrollcommand'] = self._results_text_scroller.set
 
         self._panel_params=Notebook(self._dialog)
         self._panel_params.grid(row=1,column=2,rowspan=2,sticky=(N,S,E,W))
@@ -545,6 +551,11 @@ class BatchWindow:
         self._tab_code.columnconfigure(1,weight=1)
         self._tab_code.rowconfigure(2,weight=1)
         #self._tab_code_editor.insert(END,s)
+
+        #scroll
+        self._code_editor_scroller = Scrollbar(self._tab_code, orient=VERTICAL, command=self._tab_code_editor.yview)
+        self._code_editor_scroller.grid(column=2, row=2, sticky=(W, E, N, S))
+        self._tab_code_editor['yscrollcommand'] = self._code_editor_scroller.set
 
         self._tab_code_help=Button(self._tab_code,text="Help",command=self._help)
         self._tab_code_help.grid(row=1,column=1,sticky=(N,S,E,W))
@@ -564,6 +575,11 @@ class BatchWindow:
 
         dialog.columnconfigure(1,weight=1)
         dialog.rowconfigure(1,weight=1)
+
+        #scroll
+        scroller = Scrollbar(dialog, orient=VERTICAL, command=text.yview)
+        scroller.grid(column=2, row=1, sticky=(W, E, N, S))
+        text['yscrollcommand'] = scroller.set
 
         text.tag_config("heading", font=("Consolas",16), foreground="red")
         for i in s.split("\n"):
@@ -640,7 +656,10 @@ class BatchWindow:
 
                 print("Converting",full_path,"\nUsing params:",params)
                 param_string="\n".join([i+" : "+str(params[i]) for i in params])
+
+                self._results_text.configure(state='normal')
                 self._results_text.insert("1.0","Converting : "+full_path+" ("+str(n)+"/"+str(num)+")"+"\n"+param_string+"\n\n")
+                self._results_text.configure(state='disabled')
 
                 self._master.update()
 
@@ -655,7 +674,9 @@ class BatchWindow:
                     with open(os.path.join(self._directory_to,params["Filename"]), "wb") as filee:
                         filee.write(img_dat.getbuffer())
             except:
+                self._results_text.configure(state='normal')
                 self._results_text.insert("1.0","Error while converting : "+full_path+"\n"+traceback.format_exc()+"\n\n",("error",))
+                self._results_text.configure(state='disabled')
                 break
             #sleep(1)
 
