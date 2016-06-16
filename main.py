@@ -21,6 +21,7 @@ You can enter a python script here to be run, to fully customize your conversion
 The script can use all the builtin functions of Python3.
 You can print to the standard output using print(). Those will show up in the console window.
 
+
 !Input
 The python script is given these variables:
 
@@ -32,6 +33,7 @@ Height : The height of the source image.
 Mode : Image mode of the source image.
 Size : The size of the source image file, in bytes.
 These variables are in the global namespace; you can use them like any other python variable.
+
 
 !Return values
 The python script should end with a return statement. The return statement should return a single dict, with all the image conversion parameters.
@@ -55,10 +57,18 @@ The "Resize" element should be a tuple, containg two elements, for the desired X
 You can also specify the sampling method, by including the "Resize_sampling" element. Valid values are "Nearest Neighbor", "Bilinear","Bicubic" and "Lanczos". If not supplied, it defaults to Bicubic sampling.
 
 
+!Presets
+A few commonly used return values are provided as a plain variable. You can just return those variables as is.
+Preset_JPEG_90 : {"Type":"JPEG","Filename":Filename_no_extension+".jpeg","Quality":90,"Subsampling":1}
+Preset_PNG : {"Type":"PNG","Filename":Filename_no_extension+".png","Compression":7}
+Preset_GIF : {"Type":"GIF","Filename":Filename_no_extension+".gif"}
+Preset_Copy : {"Type":"Copy","Filename":Filename}
+
+
 !Example code
 print("hello world")
 if Extension.lower()==".gif": #We can't convert animated GIFs, copy them as is.
-    return {"Type":"Copy","Filename":Filename}
+     return Preset_Copy #Using the copy preset here.
 if Width>1000: #If the width is too long, trim it down to 1000 pixels.
     return {"Type":"JPEG","Filename":"Converted_"+Filename_no_extension+".jpeg","Quality":70,"Subsampling":0,
             "Resize":(1000,int(1000/Width*Height)),"Resize_sampling":"Bicubic"}
@@ -299,10 +309,12 @@ If source_image is not supplied, it will default to a image-less mode, where it 
 
     def _save_image(self):
         '''Save the previously compressed image to a file.'''
+        global working_directory
+
         filename_orig = self._source_image.name
         filename_noext = os.path.splitext(filename_orig)[0]
         ext = "." + self._params["Type"]
-        path = filedialog.asksaveasfilename(defaultextension=ext,
+        path = filedialog.asksaveasfilename(defaultextension=ext, initialdir=working_directory,
                                             initialfile="Converted_" + filename_noext + ext)
         if path:
             with open(path, "wb") as f:
@@ -612,7 +624,8 @@ class BatchWindow:
 
         text.configure(state="disabled")
     def _get_dir_from(self):
-        f = filedialog.askdirectory(title="Image Folder")
+        global working_directory
+        f = filedialog.askdirectory(title="Image Folder",initialdir=working_directory)
         if f == None or f == '':
             return
         #f=r"C:\0_User\Temp\batch"
@@ -620,7 +633,8 @@ class BatchWindow:
         self._directories_from_label.configure(text=f)
 
     def _get_dir_to(self):
-        f = filedialog.askdirectory(title="Image Folder")
+        global working_directory
+        f = filedialog.askdirectory(title="Image Folder",initialdir=working_directory)
         if f == None or f == '':
             return
         #f=r"C:\0_User\Temp\batch_dest"
@@ -642,6 +656,12 @@ class BatchWindow:
         g["Height"]=img.height
         g["Mode"]=img.mode
         g["Size"]=sizee
+
+        g["Preset_JPEG_90"] = {"Type":"JPEG","Filename":g["Filename_no_extension"]+".jpeg","Quality":90,"Subsampling":1}
+        g["Preset_PNG"] = {"Type":"PNG","Filename":g["Filename_no_extension"]+".png","Compression":7}
+        g["Preset_GIF"] = {"Type":"GIF","Filename":g["Filename_no_extension"]+".gif"}
+        g["Preset_Copy"] = {"Type":"Copy","Filename":g["Filename"]}
+
         exec(functional,g)
         return g["_evaluation_function"]()
     def _convert(self):
@@ -705,14 +725,18 @@ mutableImage_source = MutableImage()
 
 image_controls = ImageControls(mutableImage_source)
 
+working_directory=None
 
 ###Backend functions###
 def new_image():
-    f = filedialog.askopenfilename()
+    global mutableImage_source
+    global working_directory
+    f = filedialog.askopenfilename(initialdir=working_directory)
     if f == None or f == '':
         return
+    working_directory=os.path.split(f)[0]
 
-    global mutableimage_source
+
     mutableImage_source.replace(PIL.Image.open(f),
                                 os.path.split(f)[1])  # Get only the file name.
 
