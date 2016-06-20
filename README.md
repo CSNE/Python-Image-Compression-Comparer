@@ -2,6 +2,8 @@
 
 ![screenshot](http://i.imgur.com/gPCPdaG.png)
 
+![screenshot](http://i.imgur.com/vRse1ht.png)
+
 A simple program that lets you compare between various image compression parameters.
 
 To run the program, simply copy all the files into a directory and then run the main.py.
