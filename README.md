@@ -1,8 +1,6 @@
 # Python Image Compression Comparer
 
-<img src="http://i.imgur.com/gPCPdaG.png" alt="Screenshot" style="width: 300px;"/>
-
-<img src="http://i.imgur.com/vRse1ht.png" alt="Screenshot 2" style="width: 300px;"/>
+![screenshot](http://i.imgur.com/TpkL7wf.png)
 
 A simple program that lets you compare between various image compression parameters.
 
